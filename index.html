@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Finanziaria & Directa</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-body: #0f172a;
+      --bg-card: #1e293b;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.2);
+      --success: #4ade80;
+      --danger: #f87171;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg-body); color: var(--text-main); padding: 12px; max-width: 1100px; margin: 0 auto; min-height: 100vh; padding-top: 100px; }
+
+    /* HEADER NET WORTH SEMPRE VISIBILE */
+    .networth-sticky-header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 1000;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+    }
+    .networth-container {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .nw-title { font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px; }
+    .nw-amount { font-size: 1.5rem; font-weight: 800; color: var(--success); }
+    .nw-details { font-size: 0.8rem; color: var(--text-muted); text-align: right; }
+
+    /* ICAL BAR */
+    .top-sync-bar { background: var(--bg-card); border: 1px solid var(--border); padding: 14px; border-radius: 14px; margin-bottom: 16px; }
+    .top-sync-bar h2 { font-size: 0.85rem; color: var(--accent); margin-bottom: 8px; text-transform: uppercase; }
+    .sync-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .sync-row input { flex: 1; min-width: 240px; }
+
+    /* FORM & INPUTS */
+    input, select, button { background: #0f172a; border: 1px solid var(--border); color: var(--text-main); padding: 10px 12px; border-radius: 8px; font-size: 0.9rem; outline: none; }
+    input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    button { background: var(--accent); color: #0f172a; font-weight: 700; border: none; cursor: pointer; }
+    button:hover { opacity: 0.9; }
+    .btn-danger { background: var(--danger); color: #fff; }
+
+    /* TABS */
+    .nav-tabs { display: flex; gap: 6px; margin-bottom: 16px; background: var(--bg-card); padding: 6px; border-radius: 12px; border: 1px solid var(--border); overflow-x: auto; }
+    .tab-btn { flex: 1; padding: 10px 14px; background: transparent; color: var(--text-muted); border-radius: 8px; font-weight: 600; font-size: 0.85rem; text-align: center; cursor: pointer; border: none; white-space: nowrap; }
+    .tab-btn.active { background: var(--accent); color: #0f172a; }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* CARDS */
+    .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+    .card h3 { font-size: 1rem; color: var(--text-main); margin-bottom: 12px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
+
+    /* TABELLONE DEDICATO MENSILE */
+    .month-block { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+    .month-header { font-size: 1.1rem; font-weight: 800; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 12px; }
+    .detail-section { margin-bottom: 10px; font-size: 0.9rem; }
+    .detail-title { font-weight: bold; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; margin-bottom: 4px; }
+    .item-list { list-style: none; padding-left: 10px; }
+    .item-list li { margin-bottom: 3px; position: relative; }
+    .item-list li::before { content: "• "; color: var(--accent); font-weight: bold; }
+    .summary-row { font-weight: bold; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); display: flex; justify-content: space-between; }
+
+    /* TABELLE GENERALI */
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 8px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    th { color: var(--text-muted); }
+
+    .chart-container { position: relative; height: 260px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER STICKY NET WORTH -->
+  <div class="networth-sticky-header">
+    <div class="networth-container">
+      <div>
+        <div class="nw-title">NET WORTH TOTALE</div>
+        <div id="nwHeaderAmount" class="nw-amount">€0.00</div>
+      </div>
+      <div class="nw-details">
+        <div>Disponibile (Cassa): <span id="nwHeaderCash" style="color:var(--text-main); font-weight:bold;">€0.00</span></div>
+        <div>Valore Investimenti: <span id="nwHeaderInvested" style="color:var(--accent); font-weight:bold;">€0.00</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ICAL LINK TOP BAR -->
+  <div class="top-sync-bar">
+    <h2>🔗 Apple Calendar Sync (iCloud)</h2>
+    <div class="sync-row">
+      <input type="text" id="globalIcalUrl" value="webcal://p155-caldav.icloud.com/published/2/MTIwNjg1MTI0NTcxMjA2ON1NU07LwEagTBuNsHcVOTacGVzHyz6J9I7qlkCSqiR_8XAMJb-6JuK_i5lfqKacqjidaHsQSPhUdi-U4ly7sQU">
+      <button onclick="syncAllMonths()">Sincronizza Tutti i Mesi</button>
+    </div>
+  </div>
+
+  <!-- MENU A TAB -->
+  <div class="nav-tabs">
+    <button class="tab-btn active" onclick="switchTab('tab-compilazione', this)">✍️ Compilazione</button>
+    <button class="tab-btn" onclick="switchTab('tab-tabellone', this)">📊 Tabellone Mensile</button>
+    <button class="tab-btn" onclick="switchTab('tab-investimenti', this)">📈 Investimenti</button>
+  </div>
+
+  <!-- TAB 1: COMPILAZIONE -->
+  <div id="tab-compilazione" class="tab-content active">
+    <div class="card">
+      <h3>Seleziona Mese da Compilare</h3>
+      <input type="month" id="selectedMonth" onchange="loadSelectedMonthData()">
+    </div>
+
+    <div class="grid-2">
+      <!-- Entrata Extra con Causale -->
+      <div class="card">
+        <h3>➕ Aggiungi Entrata Extra</h3>
+        <div class="form-group">
+          <label>Causale Entrata:</label>
+          <input type="text" id="extraDesc" placeholder="Es. Vendita carte, Regalo">
+        </div>
+        <div class="form-group">
+          <label>Importo (€):</label>
+          <input type="number" id="extraAmount" placeholder="0.00" step="0.01">
+        </div>
+        <button style="width: 100%;" onclick="addExtraIncome()">Aggiungi Entrata Extra</button>
+      </div>
+
+      <!-- Spesa con Causale -->
+      <div class="card">
+        <h3>➖ Registra Spesa</h3>
+        <div class="form-group">
+          <label>Causale Spesa:</label>
+          <input type="text" id="expDesc" placeholder="Es. Cena, Benzina, Spesa">
+        </div>
+        <div class="form-group">
+          <label>Importo (€):</label>
+          <input type="number" id="expAmount" placeholder="0.00" step="0.01">
+        </div>
+        <button style="width: 100%;" onclick="addExpense()">Registra Spesa</button>
+      </div>
+    </div>
+
+    <!-- Tabelle Dettaglio Mese -->
+    <div class="grid-2">
+      <div class="card">
+        <h3>Registro Entrate Extra Mese</h3>
+        <table id="extraTable">
+          <thead><tr><th>Causale</th><th>Importo</th><th>Azione</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3>Registro Spese Mese</h3>
+        <table id="expensesTable">
+          <thead><tr><th>Causale</th><th>Importo</th><th>Azione</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: TABELLONE MENSILE -->
+  <div id="tab-tabellone" class="tab-content">
+    <div id="tabelloneContainer"></div>
+  </div>
+
+  <!-- TAB 3: INVESTIMENTI (STILE DIRECTA) -->
+  <div id="tab-investimenti" class="tab-content">
+    <div class="card">
+      <h3>🏛️ Portafoglio Directa (Modello Consigliato)</h3>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">
+        <strong>Strumento Consigliato:</strong> iShares Core MSCI World (SWDA) - ETF Azionario Globale Ad Accumulazione.
+      </p>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Capitale Totale Investito (€):</label>
+          <input type="number" id="capitalInvested" value="200" oninput="updateInvestments()">
+        </div>
+        <div class="form-group">
+          <label>Valore Attuale Portafoglio Directa (€):</label>
+          <input type="number" id="currentValue" value="205" oninput="updateInvestments()">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>➕ Registra Nuovo Acquisto / Versamento su Directa</h3>
+      <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">I soldi inseriti qui verranno automaticamente scalati dalle entrate del mese selezionato come spesa "Investimento Directa (SWDA)".</p>
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Importo Versato (€):</label>
+          <input type="number" id="newDepositAmount" placeholder="Es. 50" step="0.01">
+        </div>
+        <div class="form-group">
+          <label>Mese di Riferimento:</label>
+          <input type="month" id="depositMonth">
+        </div>
+      </div>
+      <button style="width: 100%; margin-top: 6px;" onclick="addInvestmentDeposit()">Registra Versamento PAC</button>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3>📊 Rendimento Attuale Directa</h3>
+        <div class="chart-container"><canvas id="chartStatus"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h3>📈 Stima Interesse Composto (10 Anni)</h3>
+        <div class="chart-container"><canvas id="chartProjections"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let db = JSON.parse(localStorage.getItem('finanza_db')) || {};
+    let investedCapital = parseFloat(localStorage.getItem('finanza_invested')) || 200;
+    let currentValue = parseFloat(localStorage.getItem('finanza_current_val')) || 205;
+    let savedIcal = localStorage.getItem('finanza_ical') || document.getElementById('globalIcalUrl').value;
+    
+    let chartStatusInstance = null;
+    let chartProjectionsInstance = null;
+
+    const MONTH_NAMES = ["GENNAIO", "FEBBRAIO", "MARZO", "APRILE", "MAGGIO", "GIUGNO", "LUGLIO", "AGOSTO", "SETTEMBRE", "OTTOBRE", "NOVEMBRE", "DICEMBRE"];
+
+    window.onload = function() {
+      const today = new Date();
+      const mStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+      document.getElementById('selectedMonth').value = mStr;
+      document.getElementById('depositMonth').value = mStr;
+      document.getElementById('globalIcalUrl').value = savedIcal;
+
+      document.getElementById('capitalInvested').value = investedCapital;
+      document.getElementById('currentValue').value = currentValue;
+
+      loadSelectedMonthData();
+      calculateNetWorth();
+      initCharts();
+    };
+
+    function switchTab(tabId, btn) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      btn.classList.add('active');
+
+      if (tabId === 'tab-tabellone') renderTabellone();
+      if (tabId === 'tab-investimenti') updateInvestments();
+    }
+
+    function formatMonthKey(mKey) {
+      const [year, month] = mKey.split('-').map(Number);
+      const shortYear = String(year).substring(2);
+      return `${MONTH_NAMES[month - 1]} ${shortYear}`;
+    }
+
+    function loadSelectedMonthData() {
+      const m = document.getElementById('selectedMonth').value;
+      if (!db[m]) db[m] = { hoursWorked: 0, extras: [], expenses: [] };
+      renderMonthTables();
+    }
+
+    function addExtraIncome() {
+      const m = document.getElementById('selectedMonth').value;
+      const desc = document.getElementById('extraDesc').value.trim();
+      const amount = parseFloat(document.getElementById('extraAmount').value) || 0;
+
+      if (!desc || amount <= 0) return;
+      if (!db[m]) db[m] = { hoursWorked: 0, extras: [], expenses: [] };
+
+      db[m].extras.push({ id: Date.now(), desc, amount });
+      document.getElementById('extraDesc').value = '';
+      document.getElementById('extraAmount').value = '';
+
+      saveDB();
+      renderMonthTables();
+      calculateNetWorth();
+    }
+
+    function addExpense() {
+      const m = document.getElementById('selectedMonth').value;
+      const desc = document.getElementById('expDesc').value.trim();
+      const amount = parseFloat(document.getElementById('expAmount').value) || 0;
+
+      if (!desc || amount <= 0) return;
+      if (!db[m]) db[m] = { hoursWorked: 0, extras: [], expenses: [] };
+
+      db[m].expenses.push({ id: Date.now(), desc, amount });
+      document.getElementById('expDesc').value = '';
+      document.getElementById('expAmount').value = '';
+
+      saveDB();
+      renderMonthTables();
+      calculateNetWorth();
+    }
+
+    function deleteItem(type, id) {
+      const m = document.getElementById('selectedMonth').value;
+      db[m][type] = db[m][type].filter(i => i.id !== id);
+      saveDB();
+      renderMonthTables();
+      calculateNetWorth();
+    }
+
+    function renderMonthTables() {
+      const m = document.getElementById('selectedMonth').value;
+      const extraTbody = document.querySelector('#extraTable tbody');
+      const expTbody = document.querySelector('#expensesTable tbody');
+      
+      extraTbody.innerHTML = '';
+      expTbody.innerHTML = '';
+
+      const extras = (db[m] && db[m].extras) ? db[m].extras : [];
+      extras.forEach(i => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${i.desc}</td><td>€${i.amount.toFixed(2)}</td><td><button class="btn-danger" style="padding: 2px 6px;" onclick="deleteItem('extras', ${i.id})">X</button></td>`;
+        extraTbody.appendChild(tr);
+      });
+
+      const expenses = (db[m] && db[m].expenses) ? db[m].expenses : [];
+      expenses.forEach(i => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${i.desc}</td><td>€${i.amount.toFixed(2)}</td><td><button class="btn-danger" style="padding: 2px 6px;" onclick="deleteItem('expenses', ${i.id})">X</button></td>`;
+        expTbody.appendChild(tr);
+      });
+    }
+
+    function saveDB() {
+      localStorage.setItem('finanza_db', JSON.stringify(db));
+    }
+
+    // --- TABELLONE CON TUTTI I MESI ---
+    function renderTabellone() {
+      const container = document.getElementById('tabelloneContainer');
+      container.innerHTML = '';
+
+      const months = Object.keys(db).sort();
+      if (months.length === 0) {
+        container.innerHTML = '<div class="card">Nessun mese sincronizzato o compilato.</div>';
+        return;
+      }
+
+      months.forEach(m => {
+        const [year, month] = m.split('-').map(Number);
+        let prevDate = new Date(year, month - 2, 1);
+        let prevMStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+
+        const prevHours = (db[prevMStr] && db[prevMStr].hoursWorked) ? db[prevMStr].hoursWorked : 0;
+        const salary = prevHours * 9.58;
+        const extrasList = db[m].extras || [];
+        const expensesList = db[m].expenses || [];
+
+        const totalExtra = extrasList.reduce((sum, i) => sum + i.amount, 0);
+        const totalExpenses = expensesList.reduce((sum, i) => sum + i.amount, 0);
+        const netSavings = (salary + totalExtra) - totalExpenses;
+
+        const block = document.createElement('div');
+        block.className = 'month-block';
+
+        let extraHTML = extrasList.length > 0 
+          ? extrasList.map(i => `<li>${i.desc}: €${i.amount.toFixed(2)}</li>`).join('') 
+          : '<li>Nessuna entrata extra</li>';
+
+        let expHTML = expensesList.length > 0 
+          ? expensesList.map(i => `<li>${i.desc}: €${i.amount.toFixed(2)}</li>`).join('') 
+          : '<li>Nessuna spesa inserita</li>';
+
+        block.innerHTML = `
+          <div class="month-header">${formatMonthKey(m)}</div>
+          
+          <div class="detail-section">
+            <div class="detail-title">STIPENDIO (Accredito il 10 - da ${prevHours.toFixed(1)}h mese prec.):</div>
+            <div style="font-weight:bold; color:var(--success); padding-left:10px;">€${salary.toFixed(2)}</div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-title">EXTRA:</div>
+            <ul class="item-list">${extraHTML}</ul>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-title">SPESE:</div>
+            <ul class="item-list">${expHTML}</ul>
+            <div style="font-size:0.85rem; font-weight:bold; color:var(--danger); padding-left:10px; margin-top:4px;">
+              TOTALE SPESE: €${totalExpenses.toFixed(2)}
+            </div>
+          </div>
+
+          <div class="summary-row">
+            <span>RISPARMIO NETTO:</span>
+            <span style="color: ${netSavings >= 0 ? 'var(--success)' : 'var(--danger)'};">€${netSavings.toFixed(2)}</span>
+          </div>
+        `;
+        container.appendChild(block);
+      });
+    }
+
+    // --- LOGICA INVESTIMENTI & AUTOMATISMO SPESE ---
+    function addInvestmentDeposit() {
+      const amount = parseFloat(document.getElementById('newDepositAmount').value) || 0;
+      const m = document.getElementById('depositMonth').value;
+
+      if (amount <= 0 || !m) return alert("Inserisci importo e mese validi.");
+
+      investedCapital += amount;
+      currentValue += amount; // Aggiorna sia il capitale che il valore attuale
+
+      document.getElementById('capitalInvested').value = investedCapital;
+      document.getElementById('currentValue').value = currentValue;
+
+      if (!db[m]) db[m] = { hoursWorked: 0, extras: [], expenses: [] };
+      db[m].expenses.push({ id: Date.now(), desc: 'Investimento Directa (SWDA)', amount });
+
+      document.getElementById('newDepositAmount').value = '';
+
+      saveDB();
+      updateInvestments();
+      alert(`Registrati €${amount.toFixed(2)} su Directa e aggiunti automaticamente alle Spese di ${formatMonthKey(m)}.`);
+    }
+
+    function updateInvestments() {
+      investedCapital = parseFloat(document.getElementById('capitalInvested').value) || 0;
+      currentValue = parseFloat(document.getElementById('currentValue').value) || 0;
+
+      localStorage.setItem('finanza_invested', investedCapital);
+      localStorage.setItem('finanza_current_val', currentValue);
+
+      calculateNetWorth();
+      updatePACCharts();
+    }
+
+    function calculateNetWorth() {
+      let totalIncome = 0;
+      let totalExpenses = 0;
+
+      Object.keys(db).forEach(m => {
+        const [year, month] = m.split('-').map(Number);
+        let prevDate = new Date(year, month - 2, 1);
+        let prevMStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+
+        const prevHours = (db[prevMStr] && db[prevMStr].hoursWorked) ? db[prevMStr].hoursWorked : 0;
+        const salary = prevHours * 9.58;
+        const totalExtra = (db[m].extras || []).reduce((sum, i) => sum + i.amount, 0);
+        const monthExpenses = (db[m].expenses || []).reduce((sum, i) => sum + i.amount, 0);
+
+        totalIncome += (salary + totalExtra);
+        totalExpenses += monthExpenses;
+      });
+
+      const cashAvailable = totalIncome - totalExpenses;
+      const totalNetWorth = cashAvailable + currentValue;
+
+      document.getElementById('nwHeaderAmount').innerText = `€${totalNetWorth.toFixed(2)}`;
+      document.getElementById('nwHeaderCash').innerText = `€${cashAvailable.toFixed(2)}`;
+      document.getElementById('nwHeaderInvested').innerText = `€${currentValue.toFixed(2)}`;
+    }
+
+    // --- ICAL PARSER CON INCLUSIONE AUTOMATICA TUTTI I MESI ---
+    async function syncAllMonths() {
+      const urlInput = document.getElementById('globalIcalUrl').value.trim();
+      if (!urlInput) return alert("Inserisci URL del Calendario");
+      
+      localStorage.setItem('finanza_ical', urlInput);
+      const httpUrl = urlInput.replace("webcal://", "https://");
+
+      try {
+        const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(httpUrl);
+        const res = await fetch(proxyUrl);
+        if (!res.ok) throw new Error("Network error");
+        const text = await res.text();
+
+        let monthHoursMap = {};
+        const lines = text.split(/\r?\n/);
+        let isWork = false, start = null, end = null;
+
+        for (let i = 0; i < lines.length; i++) {
+          let l = lines[i].trim();
+          if (l.startsWith("BEGIN:VEVENT")) { isWork = false; start = null; end = null; }
+          if (l.startsWith("SUMMARY:") && l.toUpperCase().includes("LAVORO")) isWork = true;
+          if (l.startsWith("DTSTART")) start = parseICalDate(l);
+          if (l.startsWith("DTEND")) end = parseICalDate(l);
+
+          if (l.startsWith("END:VEVENT") && isWork && start && end) {
+            const h = (end - start) / (1000 * 60 * 60);
+            if (h > 0 && h < 24) {
+              const mKey = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
+              monthHoursMap[mKey] = (monthHoursMap[mKey] || 0) + h;
+            }
+          }
+        }
+
+        Object.keys(monthHoursMap).forEach(mKey => {
+          if (!db[mKey]) db[mKey] = { hoursWorked: 0, extras: [], expenses: [] };
+          db[mKey].hoursWorked = monthHoursMap[mKey];
+        });
+
+        saveDB();
+        loadSelectedMonthData();
+        calculateNetWorth();
+        alert("Sincronizzazione completata! Mostrati tutti i mesi con ore di lavoro.");
+      } catch(e) {
+        alert("Errore durante la lettura del calendario.");
+      }
+    }
+
+    function parseICalDate(line) {
+      try {
+        const val = line.split(":")[1];
+        if (!val) return null;
+        const raw = val.split(";")[0].trim();
+        const y = parseInt(raw.substring(0,4), 10);
+        const m = parseInt(raw.substring(4,6), 10) - 1;
+        const d = parseInt(raw.substring(6,8), 10);
+        let h = 0, min = 0;
+        if (raw.includes("T")) {
+          const tIdx = raw.indexOf("T");
+          h = parseInt(raw.substring(tIdx + 1, tIdx + 3), 10);
+          min = parseInt(raw.substring(tIdx + 3, tIdx + 5), 10);
+        }
+        return new Date(y, m, d, h, min);
+      } catch(e) { return null; }
+    }
+
+    // --- GRAFICI DIRECTA ---
+    function initCharts() {
+      const ctx1 = document.getElementById('chartStatus').getContext('2d');
+      chartStatusInstance = new Chart(ctx1, {
+        type: 'doughnut',
+        data: {
+          labels: ['Capitale Versato', 'Plusvalenza / Guadagno'],
+          datasets: [{ data: [200, 5], backgroundColor: ['#38bdf8', '#4ade80'] }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      const ctx2 = document.getElementById('chartProjections').getContext('2d');
+      chartProjectionsInstance = new Chart(ctx2, {
+        type: 'line',
+        data: {
+          labels: Array.from({length: 10}, (_, i) => `Anno ${i+1}`),
+          datasets: [
+            { label: 'Capitale Versato', data: [], borderColor: '#38bdf8', fill: false },
+            { label: 'Valore Stimato (Interesse Composto SWDA 7.5%)', data: [], borderColor: '#4ade80', fill: false }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      updatePACCharts();
+    }
+
+    function updatePACCharts() {
+      if (!chartStatusInstance || !chartProjectionsInstance) return;
+
+      const profit = Math.max(0, currentValue - investedCapital);
+      chartStatusInstance.data.datasets[0].data = [investedCapital, profit];
+      chartStatusInstance.update();
+
+      const monthlyReturn = 0.075 / 12; // 7.5% annuo medio ETF SWDA
+      const monthlyPac = 50;
+
+      let investedArray = [];
+      let projectedArray = [];
+      let totalProjected = currentValue;
+      let totalInvested = investedCapital;
+
+      for (let y = 1; y <= 10; y++) {
+        for (let m = 0; m < 12; m++) {
+          totalProjected = (totalProjected + monthlyPac) * (1 + monthlyReturn);
+          totalInvested += monthlyPac;
+        }
+        investedArray.push(totalInvested.toFixed(2));
+        projectedArray.push(totalProjected.toFixed(2));
+      }
+
+      chartProjectionsInstance.data.datasets[0].data = investedArray;
+      chartProjectionsInstance.data.datasets[1].data = projectedArray;
+      chartProjectionsInstance.update();
+    }
+  </script>
+</body>
+</html>
