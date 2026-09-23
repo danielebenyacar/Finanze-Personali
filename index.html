@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Finanziaria</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-body: #0f172a;
+      --bg-card: #1e293b;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.2);
+      --success: #4ade80;
+      --danger: #f87171;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg-body); color: var(--text-main); min-height: 100vh; padding-top: 85px; }
+
+    /* HEADER STICKY GLOBALE */
+    .global-sticky-header {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+      background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px; display: flex; align-items: center; gap: 15px;
+    }
+    
+    .menu-btn { background: transparent; border: none; color: var(--text-main); font-size: 1.6rem; cursor: pointer; padding: 0; line-height: 1; }
+
+    .header-stats-wrapper { display: flex; flex: 1; justify-content: space-between; align-items: center; gap: 8px; }
+    .header-stat { display: flex; flex-direction: column; text-align: right; }
+    .header-stat-title { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: bold; }
+    .header-stat-val { font-size: 0.9rem; font-weight: 800; white-space: nowrap; }
+
+    /* SIDEBAR (MENU LATERALE) */
+    .sidebar-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 1040; display: none; }
+    .sidebar { position: fixed; top: 0; left: -260px; bottom: 0; width: 250px; background: #1e293b; border-right: 1px solid var(--border); z-index: 1050; padding: 60px 16px 20px 16px; transition: left 0.3s ease; display: flex; flex-direction: column; justify-content: space-between; }
+    .sidebar.open { left: 0; }
+    .sidebar-overlay.open { display: block; }
+    
+    .nav-list { list-style: none; }
+    .nav-item { padding: 12px 14px; margin-bottom: 8px; border-radius: 10px; color: var(--text-muted); font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+    .nav-item.active, .nav-item:hover { background: var(--accent); color: #0f172a; }
+
+    /* CONTENITORE PRINCIPALE */
+    .main-container { max-width: 1000px; margin: 0 auto; padding: 16px; }
+
+    /* CARDS & FORM */
+    .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 18px; margin-bottom: 16px; }
+    .card h3 { font-size: 1rem; color: var(--text-main); margin-bottom: 12px; }
+    
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
+    input, select, button { background: #0f172a; border: 1px solid var(--border); color: var(--text-main); padding: 10px 12px; border-radius: 8px; font-size: 0.9rem; outline: none; width: 100%; }
+    input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    button.btn-primary { background: var(--accent); color: #0f172a; font-weight: 700; border: none; cursor: pointer; }
+    button.btn-primary:hover { opacity: 0.9; }
+    .btn-danger { background: var(--danger); color: #fff; width: auto; padding: 4px 10px; font-size: 0.75rem; border-radius: 6px; border: none; cursor: pointer;}
+
+    /* HOME HERO CARDS */
+    .home-hero-card { text-align: center; padding: 16px 10px; border-width: 2px; }
+    .hero-title { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: bold; }
+    .hero-val { font-size: 1.8rem; font-weight: 900; margin-top: 6px; }
+
+    /* TABELLONE MENSILE INTERATTIVO */
+    .month-block { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+    .month-header { font-size: 1.1rem; font-weight: 800; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 12px; display:flex; justify-content:space-between;}
+    .status-badge { font-size:0.7rem; padding: 3px 8px; border-radius: 10px; background: rgba(255,255,255,0.1); color: var(--text-muted); }
+    
+    .detail-section { margin-bottom: 10px; font-size: 0.9rem; }
+    .detail-title { font-weight: bold; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; margin-bottom: 6px; }
+    
+    .item-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+    .item-desc { display: flex; align-items: center; gap: 6px; }
+    .item-desc::before { content: "•"; color: var(--accent); font-weight: bold; }
+
+    .quick-add-box { background: rgba(15,23,42,0.6); border: 1px solid var(--border); padding: 10px; border-radius: 10px; margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .quick-add-box input, .quick-add-box select { flex: 1; min-width: 110px; font-size: 0.8rem; padding: 6px 8px; }
+
+    .summary-row { font-weight: bold; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); display: flex; justify-content: space-between; }
+
+    .chart-container { position: relative; height: 320px; margin-top: 10px; }
+    .sync-collapsible { background: #0f172a; border: 1px solid var(--border); border-radius: 10px; padding: 10px; margin-top: 10px; display: none; }
+    
+    .tab-content { display: none; }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER FISSO -->
+  <div class="global-sticky-header">
+    <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+    <div class="header-stats-wrapper">
+      <div class="header-stat" style="text-align: left;">
+        <span class="header-stat-title">Net Worth</span>
+        <span id="headerNw" class="header-stat-val" style="color:var(--success);">€0.00</span>
+      </div>
+      <div class="header-stat">
+        <span class="header-stat-title">Contabili</span>
+        <span id="headerCash" class="header-stat-val" style="color:var(--text-main);">€0.00</span>
+      </div>
+      <div class="header-stat">
+        <span class="header-stat-title">Investiti</span>
+        <span id="headerInvested" class="header-stat-val" style="color:var(--accent);">€0.00</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+  <div class="sidebar" id="sidebar">
+    <div>
+      <h2 style="font-size:1.1rem; color:var(--accent); margin-bottom:20px; text-align: center;">FINANZA APP</h2>
+      <ul class="nav-list">
+        <li class="nav-item active" onclick="navTo('tab-home', this)">🏠 Home</li>
+        <li class="nav-item" onclick="navTo('tab-tabellone', this)">📊 Tabellone Mensile</li>
+        <li class="nav-item" onclick="navTo('tab-investimenti', this)">📈 Investimenti</li>
+      </ul>
+    </div>
+
+    <div>
+      <button style="font-size:0.75rem; background:transparent; color:var(--text-muted); border:1px solid var(--border); padding:8px;" onclick="toggleSyncBox()">⚙️ Impostazioni iCal</button>
+      <div id="syncBox" class="sync-collapsible">
+        <label style="font-size:0.7rem; color:var(--text-muted);">URL Calendario iCloud:</label>
+        <input type="text" id="globalIcalUrl" style="font-size:0.7rem; margin:6px 0;" value="webcal://p155-caldav.icloud.com/published/2/MTIwNjg1MTI0NTcxMjA2ON1NU07LwEagTBuNsHcVOTacGVzHyz6J9I7qlkCSqiR_8XAMJb-6JuK_i5lfqKacqjidaHsQSPhUdi-U4ly7sQU">
+        <button class="btn-primary" style="font-size:0.75rem; padding:6px;" onclick="syncAllMonths()">Sincronizza Ora</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTAINER -->
+  <div class="main-container">
+
+    <!-- TAB 1: HOME -->
+    <div id="tab-home" class="tab-content" style="display:block;">
+      <div class="grid-3">
+        <div class="card home-hero-card" style="border-color: var(--text-main);">
+          <div class="hero-title">Liquidità Contabile</div>
+          <div id="homeCashHero" class="hero-val" style="color:var(--text-main);">€0.00</div>
+        </div>
+        <div class="card home-hero-card" style="border-color: var(--success);">
+          <div class="hero-title">Net Worth Totale</div>
+          <div id="homeNwHero" class="hero-val" style="color:var(--success);">€0.00</div>
+        </div>
+        <div class="card home-hero-card" style="border-color: var(--accent);">
+          <div class="hero-title">Valore Investimenti</div>
+          <div id="homeInvestedHero" class="hero-val" style="color:var(--accent);">€0.00</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>📈 Andamento Patrimonio (Fino al mese corrente)</h3>
+        <div class="chart-container">
+          <canvas id="chartHomeTrend"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: TABELLONE MENSILE -->
+    <div id="tab-tabellone" class="tab-content">
+      <div id="tabelloneContainer"></div>
+    </div>
+
+    <!-- TAB 3: INVESTIMENTI -->
+    <div id="tab-investimenti" class="tab-content">
+      <div class="grid-2">
+        <div class="card">
+          <h3>💼 Valore Attuale Portafoglio Directa</h3>
+          <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">Aggiorna manualmente il valore a cui ammontano oggi i tuoi investimenti (Premi Invio per salvare):</p>
+          <div class="form-group">
+            <label>Valore Attuale Totale (€):</label>
+            <input type="number" id="currentValue" placeholder="Es. 205.50" step="0.01" onkeydown="if(event.key==='Enter') setPortfolioValue()">
+          </div>
+          <button class="btn-primary" onclick="setPortfolioValue()">Aggiorna Valore</button>
+        </div>
+
+        <div class="card">
+          <h3>➕ Registra Versamento / Acquisto PAC</h3>
+          <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">L'importo sarà aggiunto automaticamente alle spese del mese selezionato.</p>
+          <div class="form-group">
+            <label>Importo Versato (€):</label>
+            <input type="number" id="newDepositAmount" placeholder="Es. 50" step="0.01" onkeydown="if(event.key==='Enter') addInvestmentDeposit()">
+          </div>
+          <div class="form-group">
+            <label>Mese di Riferimento:</label>
+            <input type="month" id="depositMonth">
+          </div>
+          <button class="btn-primary" onclick="addInvestmentDeposit()">Registra Versamento</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>📊 Riepilogo Investimenti</h3>
+        <div style="display:flex; justify-content:space-around; text-align:center; padding:10px 0;">
+          <div>
+            <div style="font-size:0.75rem; color:var(--text-muted);">VALORE ATTUALE</div>
+            <div id="displayCurrentVal" style="font-size:1.4rem; font-weight:bold; color:var(--accent);">€0.00</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3>Asset Allocation (Cassa vs Investimenti)</h3>
+          <div class="chart-container" style="height:240px;"><canvas id="chartStatus"></canvas></div>
+        </div>
+
+        <div class="card">
+          <h3>Stima PAC Interesse Composto (10 Anni)</h3>
+          <p style="font-size:0.7rem; color:var(--text-muted); text-align:center;">Proiezione PAC SWDA (7.5% annuo)</p>
+          <div class="chart-container" style="height:220px;"><canvas id="chartProjections"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let db = JSON.parse(localStorage.getItem('finanza_db')) || {};
+    let currentValue = parseFloat(localStorage.getItem('finanza_current_val')) || 0;
+    let savedIcal = localStorage.getItem('finanza_ical') || document.getElementById('globalIcalUrl').value;
+    
+    let chartHomeTrendInstance = null;
+    let chartStatusInstance = null;
+    let chartProjectionsInstance = null;
+    
+    // Variabili per il Time-gating (Calcolo realistico)
+    let globalCash = 0;
+    let globalNetWorth = 0;
+
+    const MONTH_NAMES = ["GENNAIO", "FEBBRAIO", "MARZO", "APRILE", "MAGGIO", "GIUGNO", "LUGLIO", "AGOSTO", "SETTEMBRE", "OTTOBRE", "NOVEMBRE", "DICEMBRE"];
+
+    window.onload = function() {
+      const today = new Date();
+      const mStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+      document.getElementById('depositMonth').value = mStr;
+      document.getElementById('globalIcalUrl').value = savedIcal;
+      document.getElementById('currentValue').value = currentValue;
+
+      calculateNetWorth();
+      initCharts();
+    };
+
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.querySelector('.sidebar-overlay').classList.toggle('open');
+    }
+
+    function toggleSyncBox() {
+      const box = document.getElementById('syncBox');
+      box.style.display = box.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function navTo(tabId, el) {
+      document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      
+      document.getElementById(tabId).style.display = 'block';
+      el.classList.add('active');
+
+      if (tabId === 'tab-home') updateHomeTrendChart();
+      if (tabId === 'tab-tabellone') renderTabellone();
+      if (tabId === 'tab-investimenti') updateInvestmentsDisplay();
+
+      toggleSidebar();
+    }
+
+    function formatMonthKey(mKey) {
+      const [year, month] = mKey.split('-').map(Number);
+      const shortYear = String(year).substring(2);
+      return `${MONTH_NAMES[month - 1]} ${shortYear}`;
+    }
+
+    // --- TABELLONE INTERATTIVO & QUICK ADD ---
+    function quickAddItem(mKey) {
+      const desc = document.getElementById(`qDesc_${mKey}`).value.trim();
+      const amount = parseFloat(document.getElementById(`qAmount_${mKey}`).value) || 0;
+      const type = document.getElementById(`qType_${mKey}`).value; // 'expenses' o 'extras'
+
+      if (!desc || amount <= 0) return alert("Inserisci causale e importo validi.");
+      if (!db[mKey]) db[mKey] = { hoursWorked: 0, extras: [], expenses: [] };
+      if (!db[mKey][type]) db[mKey][type] = [];
+
+      db[mKey][type].push({ id: Date.now(), desc, amount });
+
+      saveDB();
+      calculateNetWorth();
+      renderTabellone();
+    }
+
+    function deleteItem(mKey, type, id) {
+      if (!db[mKey]) return;
+      db[mKey][type] = db[mKey][type].filter(i => i.id !== id);
+      saveDB();
+      calculateNetWorth();
+      renderTabellone();
+    }
+
+    function saveDB() {
+      localStorage.setItem('finanza_db', JSON.stringify(db));
+    }
+
+    function renderTabellone() {
+      const container = document.getElementById('tabelloneContainer');
+      container.innerHTML = '';
+
+      const months = Object.keys(db).sort();
+      if (months.length === 0) {
+        container.innerHTML = '<div class="card">Nessun mese presente. Sincronizza il Calendario.</div>';
+        return;
+      }
+
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth() + 1;
+      const currentDay = today.getDate();
+
+      months.forEach(m => {
+        const [year, month] = m.split('-').map(Number);
+        let prevDate = new Date(year, month - 2, 1);
+        let prevMStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+
+        const prevHours = (db[prevMStr] && db[prevMStr].hoursWorked) ? db[prevMStr].hoursWorked : 0;
+        const salary = prevHours * 9.58;
+        
+        let statusBadge = '';
+        let isAccredited = false;
+
+        if (year < currentYear || (year === currentYear && month < currentMonth)) {
+          isAccredited = true;
+          statusBadge = '<span class="status-badge" style="color:var(--success);">✔ Completato</span>';
+        } else if (year === currentYear && month === currentMonth) {
+          if (currentDay >= 10) {
+            isAccredited = true;
+            statusBadge = '<span class="status-badge" style="color:var(--success);">✔ Accreditato</span>';
+          } else {
+            statusBadge = '<span class="status-badge" style="color:#facc15;">⏳ In attesa del 10</span>';
+          }
+        } else {
+          statusBadge = '<span class="status-badge">📅 Futuro</span>';
+        }
+
+        const extrasList = db[m].extras || [];
+        const expensesList = db[m].expenses || [];
+        const totalExtra = extrasList.reduce((sum, i) => sum + i.amount, 0);
+        const totalExpenses = expensesList.reduce((sum, i) => sum + i.amount, 0);
+        
+        // Risparmio netto mostrato a fini informativi per il mese specifico
+        const netSavings = (salary + totalExtra) - totalExpenses;
+
+        const block = document.createElement('div');
+        block.className = 'month-block';
+
+        let extraHTML = extrasList.length > 0 
+          ? extrasList.map(i => `<div class="item-row"><span class="item-desc">${i.desc}: <strong>€${i.amount.toFixed(2)}</strong></span><button class="btn-danger" onclick="deleteItem('${m}', 'extras', ${i.id})">X</button></div>`).join('') 
+          : '<div style="font-size:0.8rem; color:var(--text-muted);">Nessuna entrata extra</div>';
+
+        let expHTML = expensesList.length > 0 
+          ? expensesList.map(i => `<div class="item-row"><span class="item-desc">${i.desc}: <strong>€${i.amount.toFixed(2)}</strong></span><button class="btn-danger" onclick="deleteItem('${m}', 'expenses', ${i.id})">X</button></div>`).join('') 
+          : '<div style="font-size:0.8rem; color:var(--text-muted);">Nessuna spesa inserita</div>';
+
+        block.innerHTML = `
+          <div class="month-header">
+            <span>${formatMonthKey(m)}</span>
+            ${statusBadge}
+          </div>
+          
+          <div class="detail-section">
+            <div class="detail-title">STIPENDIO (da ${prevHours.toFixed(1)}h lavorate):</div>
+            <div style="font-weight:bold; color:${isAccredited ? 'var(--success)' : 'var(--text-muted)'}; padding-left:10px;">
+              €${salary.toFixed(2)}
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-title">ENTRATE EXTRA:</div>
+            ${extraHTML}
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-title">SPESE:</div>
+            ${expHTML}
+            <div style="font-size:0.85rem; font-weight:bold; color:var(--danger); margin-top:6px;">
+              TOTALE SPESE: €${totalExpenses.toFixed(2)}
+            </div>
+          </div>
+
+          <div class="quick-add-box">
+            <input type="text" id="qDesc_${m}" placeholder="Causale...">
+            <input type="number" id="qAmount_${m}" placeholder="€" step="0.01">
+            <select id="qType_${m}">
+              <option value="expenses">Spesa ➖</option>
+              <option value="extras">Entrata Extra ➕</option>
+            </select>
+            <button class="btn-primary" style="width:auto; padding:6px 12px; font-size:0.8rem;" onclick="quickAddItem('${m}')">Aggiungi</button>
+          </div>
+
+          <div class="summary-row">
+            <span>BILANCIO DEL MESE:</span>
+            <span style="color: ${netSavings >= 0 ? 'var(--success)' : 'var(--danger)'};">€${netSavings.toFixed(2)}</span>
+          </div>
+        `;
+        container.appendChild(block);
+      });
+    }
+
+    // --- LOGICA INVESTIMENTI ---
+    function setPortfolioValue() {
+      const val = parseFloat(document.getElementById('currentValue').value) || 0;
+      currentValue = val;
+      localStorage.setItem('finanza_current_val', currentValue);
+      calculateNetWorth();
+      updateInvestmentsDisplay();
+    }
+
+    function addInvestmentDeposit() {
+      const amount = parseFloat(document.getElementById('newDepositAmount').value) || 0;
+      const m = document.getElementById('depositMonth').value;
+
+      if (amount <= 0 || !m) return alert("Inserisci importo e mese validi.");
+
+      if (!db[m]) db[m] = { hoursWorked: 0, extras: [], expenses: [] };
+      db[m].expenses.push({ id: Date.now(), desc: 'Investimento Directa (PAC)', amount });
+
+      document.getElementById('newDepositAmount').value = '';
+      saveDB();
+      
+      calculateNetWorth();
+      updateInvestmentsDisplay();
+      alert(`Spesa di investimento registrata nel mese di ${formatMonthKey(m)}. Ricordati di aggiornare il Valore Attuale!`);
+    }
+
+    function updateInvestmentsDisplay() {
+      document.getElementById('displayCurrentVal').innerText = `€${currentValue.toFixed(2)}`;
+      updatePACCharts();
+    }
+
+    // --- CORE: CALCOLO TIME-GATED ---
+    function calculateNetWorth() {
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth() + 1;
+      const currentDay = today.getDate();
+
+      let totalIncome = 0;
+      let totalExpenses = 0;
+
+      Object.keys(db).forEach(m => {
+        const [year, month] = m.split('-').map(Number);
+        let prevDate = new Date(year, month - 2, 1);
+        let prevMStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+
+        const prevHours = (db[prevMStr] && db[prevMStr].hoursWorked) ? db[prevMStr].hoursWorked : 0;
+        const salary = prevHours * 9.58;
+        
+        const totalExtra = (db[m].extras || []).reduce((sum, i) => sum + i.amount, 0);
+        const monthExpenses = (db[m].expenses || []).reduce((sum, i) => sum + i.amount, 0);
+
+        // Mesi Passati
+        if (year < currentYear || (year === currentYear && month < currentMonth)) {
+          totalIncome += (salary + totalExtra);
+          totalExpenses += monthExpenses;
+        } 
+        // Mese Corrente
+        else if (year === currentYear && month === currentMonth) {
+          if (currentDay >= 10) totalIncome += salary; // Aggiunge stipendio solo dal 10 in poi
+          totalIncome += totalExtra;
+          totalExpenses += monthExpenses; // Spese correnti incluse
+        }
+        // Mesi futuri ignorati per la cassa attuale
+      });
+
+      globalCash = totalIncome - totalExpenses;
+      globalNetWorth = globalCash + currentValue;
+
+      // Aggiorna UI
+      document.getElementById('homeCashHero').innerText = `€${globalCash.toFixed(2)}`;
+      document.getElementById('homeNwHero').innerText = `€${globalNetWorth.toFixed(2)}`;
+      document.getElementById('homeInvestedHero').innerText = `€${currentValue.toFixed(2)}`;
+
+      document.getElementById('headerNw').innerText = `€${globalNetWorth.toFixed(2)}`;
+      document.getElementById('headerCash').innerText = `€${globalCash.toFixed(2)}`;
+      document.getElementById('headerInvested').innerText = `€${currentValue.toFixed(2)}`;
+
+      updateHomeTrendChart();
+    }
+
+    // --- CALENDARIO SYNC ---
+    async function syncAllMonths() {
+      const urlInput = document.getElementById('globalIcalUrl').value.trim();
+      if (!urlInput) return alert("Inserisci URL del Calendario");
+      
+      localStorage.setItem('finanza_ical', urlInput);
+      const httpUrl = urlInput.replace("webcal://", "https://");
+
+      try {
+        const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(httpUrl);
+        const res = await fetch(proxyUrl);
+        if (!res.ok) throw new Error("Network error");
+        const text = await res.text();
+
+        let monthHoursMap = {};
+        const lines = text.split(/\r?\n/);
+        let isWork = false, start = null, end = null;
+
+        for (let i = 0; i < lines.length; i++) {
+          let l = lines[i].trim();
+          if (l.startsWith("BEGIN:VEVENT")) { isWork = false; start = null; end = null; }
+          if (l.startsWith("SUMMARY:") && l.toUpperCase().includes("LAVORO")) isWork = true;
+          if (l.startsWith("DTSTART")) start = parseICalDate(l);
+          if (l.startsWith("DTEND")) end = parseICalDate(l);
+
+          if (l.startsWith("END:VEVENT") && isWork && start && end) {
+            const h = (end - start) / (1000 * 60 * 60);
+            if (h > 0 && h < 24) {
+              const mKey = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`;
+              monthHoursMap[mKey] = (monthHoursMap[mKey] || 0) + h;
+            }
+          }
+        }
+
+        Object.keys(monthHoursMap).forEach(mKey => {
+          if (!db[mKey]) db[mKey] = { hoursWorked: 0, extras: [], expenses: [] };
+          db[mKey].hoursWorked = monthHoursMap[mKey];
+
+          // Assicura la creazione automatica del mese successivo per mostrare il pagamento
+          const [y, m] = mKey.split('-').map(Number);
+          const nextDate = new Date(y, m, 1);
+          const nextMKey = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
+          if (!db[nextMKey]) db[nextMKey] = { hoursWorked: 0, extras: [], expenses: [] };
+        });
+
+        saveDB();
+        calculateNetWorth();
+        if(document.getElementById('tab-tabellone').style.display === 'block') renderTabellone();
+        alert("Sincronizzazione completata! Ore e mesi generati in automatico.");
+      } catch(e) {
+        alert("Errore durante la lettura del calendario.");
+      }
+    }
+
+    function parseICalDate(line) {
+      try {
+        const val = line.split(":")[1];
+        if (!val) return null;
+        const raw = val.split(";")[0].trim();
+        const y = parseInt(raw.substring(0,4), 10);
+        const m = parseInt(raw.substring(4,6), 10) - 1;
+        const d = parseInt(raw.substring(6,8), 10);
+        let h = 0, min = 0;
+        if (raw.includes("T")) {
+          const tIdx = raw.indexOf("T");
+          h = parseInt(raw.substring(tIdx + 1, tIdx + 3), 10);
+          min = parseInt(raw.substring(tIdx + 3, tIdx + 5), 10);
+        }
+        return new Date(y, m, d, h, min);
+      } catch(e) { return null; }
+    }
+
+    // --- GRAFICI ---
+    function initCharts() {
+      const ctxHome = document.getElementById('chartHomeTrend').getContext('2d');
+      chartHomeTrendInstance = new Chart(ctxHome, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [
+            { label: 'Totale Net Worth', data: [], borderColor: '#4ade80', backgroundColor: 'rgba(74, 222, 128, 0.1)', fill: true, tension: 0.3 },
+            { label: 'Risparmi Contabili', data: [], borderColor: '#f8fafc', fill: false, tension: 0.3 },
+            { label: 'Investimenti (Directa)', data: [], borderColor: '#38bdf8', fill: false, tension: 0.3 }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      const ctx1 = document.getElementById('chartStatus').getContext('2d');
+      chartStatusInstance = new Chart(ctx1, {
+        type: 'doughnut',
+        data: {
+          labels: ['Liquidità (Cassa)', 'Investimenti'],
+          datasets: [{ data: [0, 0], backgroundColor: ['#f8fafc', '#38bdf8'] }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      const ctx2 = document.getElementById('chartProjections').getContext('2d');
+      chartProjectionsInstance = new Chart(ctx2, {
+        type: 'line',
+        data: {
+          labels: Array.from({length: 10}, (_, i) => `Anno ${i+1}`),
+          datasets: [
+            { label: 'Valore Stimato PAC', data: [], borderColor: '#4ade80', fill: false }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      updateHomeTrendChart();
+      updatePACCharts();
+    }
+
+    function updateHomeTrendChart() {
+      if (!chartHomeTrendInstance) return;
+
+      const months = Object.keys(db).sort();
+      let labels = [];
+      let cashTrend = [];
+      let investedTrend = [];
+      let nwTrend = [];
+
+      let runningCash = 0;
+      
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth() + 1;
+      const currentDay = today.getDate();
+
+      months.forEach(m => {
+        const [year, month] = m.split('-').map(Number);
+        
+        // Stop plotting future months in the chart
+        if (year > currentYear || (year === currentYear && month > currentMonth)) return;
+
+        labels.push(formatMonthKey(m));
+        let prevDate = new Date(year, month - 2, 1);
+        let prevMStr = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+
+        const prevHours = (db[prevMStr] && db[prevMStr].hoursWorked) ? db[prevMStr].hoursWorked : 0;
+        const salary = prevHours * 9.58;
+        const totalExtra = (db[m].extras || []).reduce((sum, i) => sum + i.amount, 0);
+        const monthExpenses = (db[m].expenses || []).reduce((sum, i) => sum + i.amount, 0);
+
+        if (year < currentYear || (year === currentYear && month < currentMonth)) {
+          runningCash += (salary + totalExtra - monthExpenses);
+        } else if (year === currentYear && month === currentMonth) {
+          if (currentDay >= 10) runningCash += salary;
+          runningCash += (totalExtra - monthExpenses);
+        }
+
+        cashTrend.push(runningCash.toFixed(2));
+        investedTrend.push(currentValue.toFixed(2));
+        nwTrend.push((runningCash + currentValue).toFixed(2));
+      });
+
+      chartHomeTrendInstance.data.labels = labels;
+      chartHomeTrendInstance.data.datasets[0].data = nwTrend;
+      chartHomeTrendInstance.data.datasets[1].data = cashTrend;
+      chartHomeTrendInstance.data.datasets[2].data = investedTrend;
+      chartHomeTrendInstance.update();
+    }
+
+    function updatePACCharts() {
+      if (!chartStatusInstance || !chartProjectionsInstance) return;
+
+      // Aggiorna Asset Allocation
+      chartStatusInstance.data.datasets[0].data = [globalCash > 0 ? globalCash : 0, currentValue];
+      chartStatusInstance.update();
+
+      // Proiezione PAC pura sul Valore Attuale
+      const monthlyReturn = 0.075 / 12;
+      const monthlyPac = 50;
+
+      let projectedArray = [];
+      let totalProjected = currentValue;
+
+      for (let y = 1; y <= 10; y++) {
+        for (let m = 0; m < 12; m++) {
+          totalProjected = (totalProjected + monthlyPac) * (1 + monthlyReturn);
+        }
+        projectedArray.push(totalProjected.toFixed(2));
+      }
+
+      chartProjectionsInstance.data.datasets[0].data = projectedArray;
+      chartProjectionsInstance.update();
+    }
+  </script>
+</body>
+</html>
